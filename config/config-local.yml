@@ -1,0 +1,13 @@
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: example
+  database: postgres
+
+login:
+  expiry: 20
+  secret: secret
+
+server:
+  port: 8080
