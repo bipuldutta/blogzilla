@@ -227,8 +227,6 @@ func (ws *WebService) validateToken(userID int64, tokenString string) (*domain.C
 		return nil, fmt.Errorf("token has expired")
 	}
 
-	logger.Infof("##### permissions from JWT: %+v", claims.Permissions)
-
 	return claims, nil
 }
 
