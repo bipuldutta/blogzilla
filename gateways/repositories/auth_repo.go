@@ -1,16 +1,17 @@
 package repositories
 
 import (
-	"blogs/config"
-	"blogs/domain"
-	"blogs/utils"
 	"context"
 	"time"
+
+	"github.com/bipuldutta/blogzilla/config"
+	"github.com/bipuldutta/blogzilla/domain"
+	"github.com/bipuldutta/blogzilla/utils"
 
 	"github.com/dgrijalva/jwt-go"
 )
 
-var sessLogger = *utils.Logger()
+var authLogger = *utils.Logger()
 
 type AuthRepo struct {
 	conf *config.Config
@@ -36,7 +37,7 @@ func (r *AuthRepo) GetToken(ctx context.Context, userID int64, permissions []str
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token, err := jwtToken.SignedString([]byte(r.conf.Login.Secret))
 	if err != nil {
-		sessLogger.WithError(err).Error("failed to create JWT token")
+		authLogger.WithError(err).Error("failed to create JWT token")
 		return "", err
 	}
 

@@ -1,14 +1,17 @@
 package usecases
 
 import (
-	"blogs/domain"
 	"context"
 	"fmt"
+
+	"github.com/bipuldutta/blogzilla/domain"
 )
 
-// UserManager is the actual business logic section for managing all user related transactions
-// while this is a skeleton and just making calls to the repo layer at this time there could be
-// actual BL we could implement at some point
+/*
+UserManager is the actual business logic section for managing all user related transactions
+while this is a skeleton and just making calls to the repo layer at this time there could be
+actual BL we could implement at some point
+*/
 type UserManager struct {
 	userRepo domain.UserRepo
 }

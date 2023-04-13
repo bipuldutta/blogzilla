@@ -13,16 +13,23 @@ import (
 */
 
 type User struct {
-	ID        int    `json:"id"`
+	ID        int64  `json:"id"`
 	Username  string `json:"username"`
 	Password  string `json:"password"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 }
 
+type Role struct {
+	ID          int64    `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+}
+
 type Blog struct {
-	ID        int       `json:"id"`
-	UserID    int       `json:"userId"`
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"userId"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"createdAt"`

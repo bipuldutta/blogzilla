@@ -1,16 +1,17 @@
 package api
 
 import (
-	"blogs/config"
-	"blogs/domain"
-	"blogs/usecases"
-	"blogs/utils"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bipuldutta/blogzilla/config"
+	"github.com/bipuldutta/blogzilla/domain"
+	"github.com/bipuldutta/blogzilla/usecases"
+	"github.com/bipuldutta/blogzilla/utils"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
@@ -39,16 +40,27 @@ func (ws *WebService) Start() error {
 	r := mux.NewRouter()
 
 	// Define routes
-	r.HandleFunc("/register", ws.registerHandler).Methods("POST")
-	r.HandleFunc("/login", ws.loginHandler).Methods("POST")
-	r.HandleFunc("/users/{id}", ws.getUserHandler).Methods("GET")
-	r.HandleFunc("/users/{id}", ws.updateUserHandler).Methods("PUT")
-	r.HandleFunc("/users/{id}", ws.deleteUserHandler).Methods("DELETE")
-	r.HandleFunc("/users/{id}/blogs", ws.createBlogHandler).Methods("POST")
-	r.HandleFunc("/users/{id}/blogs", ws.getBlogsHandler).Methods("GET")
-	r.HandleFunc("/users/{id}/blogs/{blogID}", ws.getBlogHandler).Methods("GET")
-	r.HandleFunc("/users/{id}/blogs/{blogID}", ws.updateBlogHandler).Methods("PUT")
-	r.HandleFunc("/users/{id}/blogs/{blogID}", ws.deleteBlogHandler).Methods("DELETE")
+	// Register a new user
+	r.HandleFunc("/v1/register", ws.registerHandler).Methods("POST")
+	// User login
+	r.HandleFunc("/v1/login", ws.loginHandler).Methods("POST")
+	// Get a user details
+	r.HandleFunc("/v1/users/{id}", ws.getUserHandler).Methods("GET")
+	// Update a user details
+	r.HandleFunc("/v1/users/{id}", ws.updateUserHandler).Methods("PUT")
+	// Delete a user
+	r.HandleFunc("/v1/users/{id}", ws.deleteUserHandler).Methods("DELETE")
+
+	// Create a blog, creator id will be extracted from the jwt token
+	r.HandleFunc("/v1/blogs", ws.createBlogHandler).Methods("POST")
+	// Search all blogs, in real world application there will be filter mechanism and pagination
+	r.HandleFunc("/v1/blogs", ws.getBlogsHandler).Methods("GET")
+	// Get the details about a blog, mainly for reading purpose
+	r.HandleFunc("/v1/blogs/{id}", ws.getBlogHandler).Methods("GET")
+	// Update a blog, creator id will extracted from the jwt token
+	r.HandleFunc("/v1/blogs/{blogID}", ws.updateBlogHandler).Methods("PUT")
+	// Delete a blog, creator id will extracted from the jwt token
+	r.HandleFunc("/v1/blogs/{blogID}", ws.deleteBlogHandler).Methods("DELETE")
 
 	// Start the server
 	logger.Printf("Server listening on port %d", ws.conf.Server.Port)
@@ -65,14 +77,13 @@ func (ws *WebService) registerHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	logger.Infof("user to be created: %+v", newUser)
 	ctx := utils.CreateContext()
 	id, err := ws.userManager.Create(ctx, &newUser)
 	if err != nil {
 		http.Error(w, "Error creating user", http.StatusInternalServerError)
 		return
 	}
-	logger.Infof("successfully create user with id: %d", id)
+	logger.Infof("successfully created user with id: %d", id)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -116,7 +127,7 @@ func (ws *WebService) deleteUserHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (ws *WebService) createBlogHandler(w http.ResponseWriter, r *http.Request) {
-	code, err := ws.authorize(r, utils.CreateBlogPermission)
+	userID, code, err := ws.authorize(r, utils.CreateBlogPermission)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -130,7 +141,7 @@ func (ws *WebService) createBlogHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// continue saving data
-	logger.Info("Successfully authorized to create the blog: %+v", blog)
+	logger.Infof("Successfully authorized user: %d to create the blog: %+v", userID, blog)
 
 	// Insert the blog post into the database
 	/*
@@ -161,27 +172,21 @@ func (ws *WebService) deleteBlogHandler(w http.ResponseWriter, r *http.Request) 
 
 }
 
-func (ws *WebService) authorize(r *http.Request, permission string) (int, error) {
-	// Read the user ID from the URL path
-	userID, code, err := ws.getUserID(r)
-	if err != nil {
-		return code, err
-	}
-
+func (ws *WebService) authorize(r *http.Request, permission string) (int64, int, error) {
 	token, err := ws.extractTokenFromHeader(r)
 	if err != nil {
-		return http.StatusUnauthorized, err
+		return -1, http.StatusUnauthorized, err
 	}
 
-	claims, err := ws.validateToken(userID, token)
+	claims, err := ws.validateToken(token)
 	if err != nil {
-		return http.StatusUnauthorized, err
+		return -1, http.StatusUnauthorized, err
 	}
 
 	if !claims.HasPermission(permission) {
-		return http.StatusUnauthorized, fmt.Errorf("user does not have permission")
+		return -1, http.StatusUnauthorized, fmt.Errorf("user does not have permission")
 	}
-	return http.StatusOK, nil
+	return claims.UserID, http.StatusOK, nil
 }
 
 // ExtractTokenFromHeader extracts the JWT token from the Authorization header in the format "Bearer {token}".
@@ -199,7 +204,7 @@ func (ws *WebService) extractTokenFromHeader(r *http.Request) (string, error) {
 	return bearerToken[1], nil
 }
 
-func (ws *WebService) validateToken(userID int64, tokenString string) (*domain.CustomClaims, error) {
+func (ws *WebService) validateToken(tokenString string) (*domain.CustomClaims, error) {
 	// Parse the token without verifying the signature.
 	token, err := jwt.ParseWithClaims(tokenString, &domain.CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(ws.conf.Login.Secret), nil
@@ -217,10 +222,6 @@ func (ws *WebService) validateToken(userID int64, tokenString string) (*domain.C
 	claims, ok := token.Claims.(*domain.CustomClaims)
 	if !ok {
 		return nil, fmt.Errorf("invalid token claims")
-	}
-
-	if claims.UserID != userID {
-		return nil, fmt.Errorf("invalid token used")
 	}
 
 	if claims.ExpiresAt < time.Now().UTC().Unix() {

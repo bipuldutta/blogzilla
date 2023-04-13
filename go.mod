@@ -1,4 +1,4 @@
-module blogs
+module github.com/bipuldutta/blogzilla
 
 go 1.19
 
@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	github.com/banzaicloud/logrus-runtime-formatter v0.0.0-20190729070250-5ae5475bae5e
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0

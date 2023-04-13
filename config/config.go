@@ -12,12 +12,10 @@ import (
 var configData []byte
 
 type Config struct {
-	Postgres   PostgresConfig   `yaml:"postgres"`
-	Redis      RedisConfig      `yaml:"redis"`
-	Prometheus PrometheusConfig `yaml:"prometheus"`
-	Grafana    GrafanaConfig    `yaml:"grafana"`
-	Login      LoginConfig      `yaml:"login"`
-	Server     ServerConfig     `yaml:"server"`
+	Postgres    PostgresConfig    `yaml:"postgres"`
+	DefaultUser DefaultUserConfig `yaml:"defaultuser"`
+	Login       LoginConfig       `yaml:"login"`
+	Server      ServerConfig      `yaml:"server"`
 }
 
 func NewConfig() *Config {
@@ -38,17 +36,11 @@ type PostgresConfig struct {
 	Database string `yaml:"database"`
 }
 
-type RedisConfig struct {
-	Address string `yaml:"address"`
-}
-
-type PrometheusConfig struct {
-	URL string `yaml:"url"`
-}
-
-type GrafanaConfig struct {
-	URL      string `yaml:"url"`
-	User     string `yaml:"user"`
+// DefaultUserConfig a default admin user which will be created during database
+// initialization stage when the service startsup for the first time.
+// We recommend changing the password asap
+type DefaultUserConfig struct {
+	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 }
 

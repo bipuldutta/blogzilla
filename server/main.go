@@ -1,13 +1,14 @@
 package main
 
 import (
-	"blogs/api"
-	"blogs/config"
-	"blogs/gateways/repositories"
-	"blogs/usecases"
-	"blogs/utils"
 	"context"
 	"fmt"
+
+	"github.com/bipuldutta/blogzilla/api"
+	"github.com/bipuldutta/blogzilla/config"
+	"github.com/bipuldutta/blogzilla/gateways/repositories"
+	"github.com/bipuldutta/blogzilla/usecases"
+	"github.com/bipuldutta/blogzilla/utils"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq"
@@ -31,6 +32,13 @@ func main() {
 	sessionRepo := repositories.NewAuthRepo(conf)
 	userRepo := repositories.NewUserRepo(conf, dbPool, sessionRepo)
 	userManager := usecases.NewUserManager(userRepo)
+	databaseRepo := repositories.NewDatabaseRepo(conf, dbPool, userRepo)
+
+	// attempt initializing database tables and default roles, users etc.
+	err = databaseRepo.Initialize(ctx)
+	if err != nil {
+		logger.WithError(err).Fatalf("failed to initialize data")
+	}
 
 	webService := api.NewWebService(conf, userManager)
 	err = webService.Start()
