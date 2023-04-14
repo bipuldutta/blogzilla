@@ -33,11 +33,12 @@ func main() {
 	userRepo := repositories.NewUserRepo(conf, dbPool, sessionRepo)
 	userManager := usecases.NewUserManager(userRepo)
 	databaseRepo := repositories.NewDatabaseRepo(conf, dbPool, userRepo)
+	databaseManager := usecases.NewDatabaseManager(databaseRepo)
 
 	// attempt initializing database tables and default roles, users etc.
-	err = databaseRepo.Initialize(ctx)
+	err = databaseManager.Initialize(ctx)
 	if err != nil {
-		logger.WithError(err).Fatalf("failed to initialize data")
+		logger.WithError(err).Fatalf("failed to initialize database tables, roles, default user etc.")
 	}
 
 	webService := api.NewWebService(conf, userManager)

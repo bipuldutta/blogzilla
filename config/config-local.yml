@@ -11,7 +11,7 @@ defaultuser:
 
 login:
   expiry: 20
-  secret: secret
+  secret: thesecret
 
 server:
   port: 8080
