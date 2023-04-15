@@ -142,7 +142,7 @@ Response:
     "UserID": 3,
     "Title": "My Second Blog Post",
     "Content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vel erat ultricies, vulputate leo a, malesuada eros. Sed euismod tortor vitae nisl blandit, quis bibendum sapien ullamcorper. Proin luctus mauris eu enim finibus, non convallis risus consectetur. Sed pulvinar, nunc non consectetur bibendum, velit arcu vestibulum massa, vitae faucibus velit magna ac turpis.",
-    "Tags": "mindfulnes,foo",
+    "Tags": "mindfulness,foo",
     "CreatedAt": "2023-04-15T01:33:56.37797Z",
     "UpdatedAt": "2023-04-15T01:33:56.37797Z"
   }
