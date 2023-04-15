@@ -3,15 +3,17 @@ package utils
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	traceID = "TRACE_ID"
+
+	AdminRole  = "admin"
+	EditorRole = "editor"
+	ViewerRole = "viewer"
 
 	CreateUserPermission = "create_user"
 	ReadUserPermission   = "read_user"
@@ -23,26 +25,6 @@ const (
 	UpdateBlogPermission = "update_blog"
 	DeleteBlogPermission = "delete_blog"
 )
-
-// Create a new instance of the logger. You can have any number of instances.
-var log *logrus.Logger
-
-func init() {
-	log = logrus.New()
-	// Log as JSON instead of the default ASCII formatter.
-	log.SetFormatter(&logrus.JSONFormatter{})
-
-	// Output to stdout instead of the default stderr
-	// Can be any io.Writer, see below for File example
-	log.SetOutput(os.Stdout)
-
-	// Only log the warning severity or above.
-	log.SetLevel(logrus.InfoLevel)
-}
-
-func Logger() *logrus.Logger {
-	return log
-}
 
 func CreateContext() context.Context {
 	ctx := context.Background()

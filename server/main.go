@@ -1,13 +1,14 @@
 package main
 
 import (
-	"blogs/api"
-	"blogs/config"
-	"blogs/gateways/repositories"
-	"blogs/usecases"
-	"blogs/utils"
 	"context"
 	"fmt"
+
+	"github.com/bipuldutta/blogzilla/api"
+	"github.com/bipuldutta/blogzilla/config"
+	"github.com/bipuldutta/blogzilla/gateways/repositories"
+	"github.com/bipuldutta/blogzilla/usecases"
+	"github.com/bipuldutta/blogzilla/utils"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq"
@@ -28,11 +29,22 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	sessionRepo := repositories.NewAuthRepo(conf)
-	userRepo := repositories.NewUserRepo(conf, dbPool, sessionRepo)
+	authRepo := repositories.NewAuthRepo(conf)
+	authManager := usecases.NewAuthManager(conf)
+	userRepo := repositories.NewUserRepo(conf, dbPool, authRepo)
 	userManager := usecases.NewUserManager(userRepo)
+	databaseRepo := repositories.NewDatabaseRepo(conf, dbPool, userRepo)
+	databaseManager := usecases.NewDatabaseManager(databaseRepo)
+	blogRepo := repositories.NewBlogRepo(conf, dbPool)
+	blogManager := usecases.NewBlogManager(blogRepo)
 
-	webService := api.NewWebService(conf, userManager)
+	// attempt initializing database tables and default roles, users etc.
+	err = databaseManager.Initialize(ctx)
+	if err != nil {
+		logger.WithError(err).Fatalf("failed to initialize database tables, roles, default user etc.")
+	}
+
+	webService := api.NewWebService(conf, authManager, userManager, blogManager)
 	err = webService.Start()
 	if err != nil {
 		logger.WithError(err).Fatalf("failed to start server")

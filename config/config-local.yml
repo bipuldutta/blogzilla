@@ -5,9 +5,13 @@ postgres:
   password: example
   database: postgres
 
+defaultuser:
+  username: admin
+  password: admin
+
 login:
   expiry: 20
-  secret: secret
+  secret: thesecret
 
 server:
   port: 8080

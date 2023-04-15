@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS blogs (
   user_id INTEGER NOT NULL REFERENCES users(id),
   title TEXT NOT NULL,
   content TEXT NOT NULL,
+  tags TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -41,9 +42,3 @@ INSERT INTO roles (name, permissions) VALUES
 ('admin', ARRAY['create_user', 'read_user', 'update_user', 'delete_user', 'create_blog', 'read_blog', 'update_blog', 'delete_blog']),
 ('editor', ARRAY['create_blog', 'read_blog', 'update_blog', 'delete_blog']),
 ('viewer', ARRAY['read_user', 'read_blog']);
-
-INSERT INTO users (username, password, first_name, last_name)
-VALUES ('admin', '$2a$10$y6UOS1hDMSp6mT1TzSZpZ.59gIZrAF3q11zmLH9XhvNOO53bJV.vW', 'Admin', 'User');
-
-INSERT INTO user_roles (user_id, role_id)
-VALUES (1, 1);
