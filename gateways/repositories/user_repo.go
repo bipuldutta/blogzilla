@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/bipuldutta/blogzilla/config"
 	"github.com/bipuldutta/blogzilla/domain"
@@ -16,7 +17,7 @@ import (
 const (
 	createUserQuery    = `INSERT INTO users (username, password, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id`
 	assignUserRoles    = `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`
-	getUserByNameQuery = `SELECT id, username, password, first_name, last_name FROM users WHERE username = $1`
+	getUserByNameQuery = `SELECT id, username, password, first_name, last_name, created_at, updated_at FROM users WHERE username = $1`
 	getRoleByName      = `SELECT id, name, description, UNNEST(permissions) FROM roles WHERE name = $1`
 	permissionQuery    = `SELECT DISTINCT UNNEST(r.permissions)
 		FROM roles r
@@ -39,19 +40,19 @@ func NewUserRepo(conf *config.Config, client *pgxpool.Pool, sessionRepo domain.A
 		sessionRepo: sessionRepo,
 	}
 }
-func (r *UserRepo) Create(ctx context.Context, newUser *domain.User) (int64, error) {
+func (r *UserRepo) Create(ctx context.Context, newUser *domain.User) (*domain.User, error) {
 	// hash password
 	hashedPassword, err := r.hashPassword(newUser.Password)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to hash password")
-		return -1, err
+		return nil, err
 	}
 	var userID int64
 	// create user and return its id
 	err = r.client.QueryRow(ctx, createUserQuery, newUser.Username, hashedPassword, newUser.FirstName, newUser.LastName).Scan(&userID)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to create user")
-		return -1, err
+		return nil, err
 	}
 
 	// assign editor and viewer roles to this user
@@ -61,19 +62,26 @@ func (r *UserRepo) Create(ctx context.Context, newUser *domain.User) (int64, err
 	editorRole, err := r.GetRoleByName(ctx, utils.EditorRole)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to get editor role")
-		return -1, err
+		return nil, err
 	}
 	viewerRole, err := r.GetRoleByName(ctx, utils.ViewerRole)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to get viewer role")
-		return -1, err
+		return nil, err
 	}
 	err = r.AssignRoles(ctx, userID, editorRole.ID, viewerRole.ID)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to assign roles to the user")
-		return -1, err
+		return nil, err
 	}
-	return userID, nil
+	// since the create was successful, set it ID
+	createdUser, err := r.GetUserByUsername(ctx, newUser.Username)
+	if err != nil {
+		userLogger.WithError(err).Error("failed to get the user during creation")
+		return nil, err
+	}
+
+	return createdUser, nil
 }
 func (r *UserRepo) AssignRoles(ctx context.Context, userID int64, roleIDs ...int64) error {
 	// create user and return its id
@@ -98,7 +106,7 @@ func (r *UserRepo) GetRoleByName(ctx context.Context, roleName string) (*domain.
 	for rows.Next() {
 		var permission string
 		if err := rows.Scan(&id, &name, &description, &permission); err != nil {
-			dbLogger.WithError(err).Error("failed to get role by name")
+			userLogger.WithError(err).Error("failed to get role by name")
 			return nil, err
 		}
 		permissions = append(permissions, permission)
@@ -118,6 +126,7 @@ func (r *UserRepo) GetUserByUsername(ctx context.Context, uname string) (*domain
 	var userID int64
 	var username, password string
 	var firstName, lastName sql.NullString
+	var createdAt, updatedAt time.Time
 
 	rows, err := r.client.Query(ctx, getUserByNameQuery, uname)
 	if err != nil {
@@ -129,16 +138,18 @@ func (r *UserRepo) GetUserByUsername(ctx context.Context, uname string) (*domain
 		// user not found
 		return nil, nil
 	}
-	err = rows.Scan(&userID, &username, &password, &firstName, &lastName)
+	err = rows.Scan(&userID, &username, &password, &firstName, &lastName, &createdAt, &updatedAt)
 	if err != nil {
 		userLogger.WithError(err).Error("failed to read user data")
 		return nil, fmt.Errorf("failed to read user data")
 	}
 
 	user := &domain.User{
-		ID:       userID,
-		Username: username,
-		Password: password,
+		ID:        userID,
+		Username:  username,
+		Password:  password,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
 	}
 	if firstName.Valid {
 		user.FirstName = firstName.String

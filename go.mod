@@ -17,11 +17,13 @@ require (
 )
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/banzaicloud/logrus-runtime-formatter v0.0.0-20190729070250-5ae5475bae5e
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jackc/pgx/v4 v4.18.1
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.7
 	golang.org/x/crypto v0.8.0
 	golang.org/x/sys v0.7.0 // indirect

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS blogs (
   user_id INTEGER NOT NULL REFERENCES users(id),
   title TEXT NOT NULL,
   content TEXT NOT NULL,
-  tags TEXT[],
+  tags TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

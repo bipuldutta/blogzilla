@@ -20,10 +20,10 @@ func NewUserManager(userRepo domain.UserRepo) *UserManager {
 	return &UserManager{userRepo: userRepo}
 }
 
-func (m *UserManager) Create(ctx context.Context, newUser *domain.User) (int64, error) {
+func (m *UserManager) Create(ctx context.Context, newUser *domain.User) (*domain.User, error) {
 	// validate user input
 	if newUser.Username == "" || newUser.Password == "" || newUser.FirstName == "" || newUser.LastName == "" {
-		return -1, fmt.Errorf("incomplete user information")
+		return nil, fmt.Errorf("incomplete user information")
 	}
 
 	return m.userRepo.Create(ctx, newUser)

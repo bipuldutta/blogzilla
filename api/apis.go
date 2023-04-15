@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/bipuldutta/blogzilla/config"
-	"github.com/bipuldutta/blogzilla/domain"
 	"github.com/bipuldutta/blogzilla/usecases"
 	"github.com/bipuldutta/blogzilla/utils"
 
@@ -19,32 +19,36 @@ var (
 )
 
 /*
-WebService is the main entry to the APIs. In real worl application we will collect several matrix such as
+WebService is the main entry to the APIs exposed by Blogzilla. In real world application we will collect several matrix such as
 each endpoints request/response latency, counter etc.
 */
 type WebService struct {
 	conf           *config.Config
 	authMiddleware *AuthMiddleware
 	userManager    *usecases.UserManager
+	blogManager    *usecases.BlogManager
 }
 
-func NewWebService(conf *config.Config, userManager *usecases.UserManager) *WebService {
+func NewWebService(conf *config.Config, authManager *usecases.AuthManager, userManager *usecases.UserManager, blogManager *usecases.BlogManager) *WebService {
 	logger = utils.Logger()
 	return &WebService{
 		conf:           conf,
-		authMiddleware: NewAuthMiddleware(conf),
+		authMiddleware: NewAuthMiddleware(conf, authManager),
 		userManager:    userManager,
+		blogManager:    blogManager,
 	}
 }
 
 func (ws *WebService) Start() error {
 	// Initialize HTTP router
 	r := mux.NewRouter()
+
 	// Define routes
+
 	// Register a new user
-	r.HandleFunc("/v1/register", ws.registerHandler).Methods("POST")
+	r.Handle("/v1/register", http.HandlerFunc(ws.registerHandler)).Methods("POST")
 	// User login
-	r.HandleFunc("/v1/login", ws.loginHandler).Methods("POST")
+	r.Handle("/v1/login", http.HandlerFunc(ws.loginHandler)).Methods("POST")
 	// Get a user details
 	r.Handle("/v1/users/{id}", ws.authMiddleware.authorize(utils.ReadUserPermission, http.HandlerFunc(ws.getUserHandler))).Methods("GET")
 	// Update a user details
@@ -54,14 +58,14 @@ func (ws *WebService) Start() error {
 
 	// Create a blog, creator id will be extracted from the jwt token
 	r.Handle("/v1/blogs", ws.authMiddleware.authorize(utils.CreateBlogPermission, http.HandlerFunc(ws.createBlogHandler))).Methods("POST")
+	// Update a blog, creator id will extracted from the jwt token
+	r.Handle("/v1/blogs", ws.authMiddleware.authorize(utils.UpdateBlogPermission, http.HandlerFunc(ws.updateBlogHandler))).Methods("PUT")
 	// Search all blogs, in real world application there will be filter mechanism and pagination
-	r.Handle("/v1/blogs", ws.authMiddleware.authorize(utils.ReadBlogPermission, http.HandlerFunc(ws.getBlogsHandler))).Methods("GET")
+	r.Handle("/v1/blogs", ws.authMiddleware.authorize(utils.ReadBlogPermission, http.HandlerFunc(ws.searchBlogsHandler))).Methods("GET")
 	// Get the details about a blog, mainly for reading purpose
 	r.Handle("/v1/blogs/{id}", ws.authMiddleware.authorize(utils.ReadBlogPermission, http.HandlerFunc(ws.getBlogHandler))).Methods("GET")
-	// Update a blog, creator id will extracted from the jwt token
-	r.Handle("/v1/blogs/{id}", ws.authMiddleware.authorize(utils.UpdateBlogPermission, http.HandlerFunc(ws.updateBlogHandler))).Methods("PUT")
 	// Delete a blog, creator id will extracted from the jwt token
-	r.Handle("/v1/blogs/{id}", ws.authMiddleware.authorize(utils.DeleteBlogPermission, http.HandlerFunc(ws.deleteBlogHandler))).Methods("GET")
+	r.Handle("/v1/blogs/{id}", ws.authMiddleware.authorize(utils.DeleteBlogPermission, http.HandlerFunc(ws.deleteBlogHandler))).Methods("DELETE")
 
 	// Start the server
 	logger.Printf("Server listening on port %d", ws.conf.Server.Port)
@@ -71,26 +75,41 @@ func (ws *WebService) Start() error {
 }
 
 func (ws *WebService) registerHandler(w http.ResponseWriter, r *http.Request) {
-	var newUser domain.User
+	var createRequest CreateUserRequestV1
 
-	err := json.NewDecoder(r.Body).Decode(&newUser)
+	err := json.NewDecoder(r.Body).Decode(&createRequest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	ctx := utils.CreateContext()
-	id, err := ws.userManager.Create(ctx, &newUser)
+	newUser := convertCreateUserRequestToDomain(&createRequest)
+
+	createdUser, err := ws.userManager.Create(ctx, newUser)
 	if err != nil {
-		http.Error(w, "Error creating user", http.StatusInternalServerError)
+		http.Error(w, "error creating user", http.StatusInternalServerError)
 		return
 	}
-	logger.Infof("successfully created user with id: %d", id)
+	logger.Infof("successfully created user with id: %d", createdUser.ID)
+	response := convertUserDomainObjToAPI(createdUser)
+
+	/*
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		w.WriteHeader(http.StatusCreated)
+	*/
+	ws.setResponse(w, response)
+}
+
+func (ws *WebService) setResponse(w http.ResponseWriter, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(payload)
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (ws *WebService) loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the request body to get the username and password
-	var credentials domain.Credentials
+	var credentials CredentialsRequestV1
 	err := json.NewDecoder(r.Body).Decode(&credentials)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -116,46 +135,60 @@ func (ws *WebService) loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ws *WebService) getUserHandler(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (ws *WebService) updateUserHandler(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (ws *WebService) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (ws *WebService) createBlogHandler(w http.ResponseWriter, r *http.Request) {
 	// Read the request body
-	var blog domain.Blog
-	err := json.NewDecoder(r.Body).Decode(&blog)
+	var blogRequest CreateBlogRequestV1
+	err := json.NewDecoder(r.Body).Decode(&blogRequest)
 	if err != nil {
-		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
+		http.Error(w, "failed to decode request body", http.StatusBadRequest)
 		return
 	}
 	// continue saving data
 	userID := ws.getUserID(r)
-	// set the user on the way in
-	blog.UserID = userID
-	logger.Infof("Successfully authorized user: %d to create the blog: %+v", userID, blog)
+	newBlog := convertCreateBlogRequestToDomain(userID, &blogRequest)
 
 	// Insert the blog post into the database
-	/*
-		err = createBlogPost(userID, blog.Title, blog.Content)
-		if err != nil {
-			http.Error(w, "Failed to create blog post", http.StatusInternalServerError)
-			return
-		}
-	*/
+	ctx := utils.CreateContext()
+	blogID, err := ws.blogManager.Create(ctx, newBlog)
+	if err != nil {
+		http.Error(w, "failed to create blog post", http.StatusInternalServerError)
+		return
+	}
+
+	// Return the blog id to the client
+	json.NewEncoder(w).Encode(map[string]int64{
+		"id": blogID,
+	})
 
 	// Return a success response
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (ws *WebService) getBlogsHandler(w http.ResponseWriter, r *http.Request) {
-
+func (ws *WebService) searchBlogsHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+	if err != nil {
+		offset = 0 // Default offset value
+	}
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil {
+		limit = 10 // Default limit value
+	}
+	ctx := utils.CreateContext()
+	blogs, err := ws.blogManager.Search(ctx, offset, limit, query)
+	if err != nil {
+		http.Error(w, "failed to search blogs", http.StatusInternalServerError)
+		return
+	}
+	ws.setResponse(w, blogs)
 }
 
 func (ws *WebService) getBlogHandler(w http.ResponseWriter, r *http.Request) {
