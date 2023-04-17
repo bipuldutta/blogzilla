@@ -36,7 +36,7 @@ func initialize() {
 }
 
 /*
-WebService is the main entry to the APIs exposed by Blogzilla. In real world application we will collect several matrix such as
+WebService is the main entry to the APIs exposed by Blogzilla. In real world application we will collect several metrics such as
 each endpoints request/response latency, counter etc.
 */
 type WebService struct {
