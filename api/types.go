@@ -4,6 +4,15 @@ import (
 	"time"
 )
 
+type LoginRequestV1 struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type LoginResponseV1 struct {
+	Token string `json:"token"`
+}
+
 type CreateUserRequestV1 struct {
 	Username  string `json:"username"`
 	Password  string `json:"password"`
@@ -33,6 +42,10 @@ type CreateBlogRequestV1 struct {
 	Tags    string `json:"tags"`
 }
 
+type CreateBlogResponseV1 struct {
+	ID int64 `json:"id"`
+}
+
 type UpdateBlogRequestV1 struct {
 	ID      int64    `json:"id"`
 	Title   string   `json:"title"`
@@ -53,9 +66,4 @@ type BlogResponseV1 struct {
 type BlogCreatorV1 struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
-}
-
-type CredentialsRequestV1 struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
 }

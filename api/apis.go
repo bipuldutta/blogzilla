@@ -12,11 +12,28 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
 	logger *logrus.Logger
+
+	// we create a new custom metric of type counter
+	createBlogCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_request_create_blog_count", // metric name
+			Help: "Count of create blog.",
+		},
+		[]string{}, // labels
+	)
 )
+
+func initialize() {
+	logger = utils.Logger()
+	// we need to register the counter so prometheus can collect this metric
+	prometheus.MustRegister(createBlogCount)
+}
 
 /*
 WebService is the main entry to the APIs exposed by Blogzilla. In real world application we will collect several matrix such as
@@ -30,7 +47,8 @@ type WebService struct {
 }
 
 func NewWebService(conf *config.Config, authManager *usecases.AuthManager, userManager *usecases.UserManager, blogManager *usecases.BlogManager) *WebService {
-	logger = utils.Logger()
+	// call the initialize func to initialize metrics and anything else we may need
+	initialize()
 	return &WebService{
 		conf:           conf,
 		authMiddleware: NewAuthMiddleware(conf, authManager),
@@ -75,15 +93,15 @@ func (ws *WebService) Start() error {
 }
 
 func (ws *WebService) registerHandler(w http.ResponseWriter, r *http.Request) {
-	var createRequest CreateUserRequestV1
+	var request CreateUserRequestV1
 
-	err := json.NewDecoder(r.Body).Decode(&createRequest)
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	ctx := utils.CreateContext()
-	newUser := convertCreateUserRequestToDomain(&createRequest)
+	newUser := convertCreateUserRequestToDomain(&request)
 
 	createdUser, err := ws.userManager.Create(ctx, newUser)
 	if err != nil {
@@ -92,34 +110,26 @@ func (ws *WebService) registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Infof("successfully created user with id: %d", createdUser.ID)
 	response := convertUserDomainObjToAPI(createdUser)
-
-	/*
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		w.WriteHeader(http.StatusCreated)
-	*/
-	ws.setResponse(w, response)
+	ws.setResponse(w, http.StatusOK, response)
 }
 
-func (ws *WebService) setResponse(w http.ResponseWriter, payload any) {
+func (ws *WebService) setResponse(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(payload)
-	w.WriteHeader(http.StatusCreated)
 }
 
 func (ws *WebService) loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the request body to get the username and password
-	var credentials CredentialsRequestV1
-	err := json.NewDecoder(r.Body).Decode(&credentials)
+	var request LoginRequestV1
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	logger.Infof("user to be authenticated: %+v", credentials)
-
 	ctx := utils.CreateContext()
-	token, err := ws.userManager.Login(ctx, credentials.Username, credentials.Password)
+	token, err := ws.userManager.Login(ctx, request.Username, request.Password)
 	if err != nil {
 		// this could also be internal server error (DB outage, etc.),
 		// but it will take extra time to have a proper error handling
@@ -128,10 +138,10 @@ func (ws *WebService) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the session token to the client
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": token,
-	})
+	response := &LoginResponseV1{
+		Token: token,
+	}
+	ws.setResponse(w, http.StatusOK, response)
 }
 
 func (ws *WebService) getUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +154,10 @@ func (ws *WebService) deleteUserHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (ws *WebService) createBlogHandler(w http.ResponseWriter, r *http.Request) {
+
+	// increment the counter
+	createBlogCount.With(nil).Inc()
+
 	// Read the request body
 	var blogRequest CreateBlogRequestV1
 	err := json.NewDecoder(r.Body).Decode(&blogRequest)
@@ -164,12 +178,11 @@ func (ws *WebService) createBlogHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Return the blog id to the client
-	json.NewEncoder(w).Encode(map[string]int64{
-		"id": blogID,
-	})
-
+	response := &CreateBlogResponseV1{
+		ID: blogID,
+	}
 	// Return a success response
-	w.WriteHeader(http.StatusCreated)
+	ws.setResponse(w, http.StatusCreated, response)
 }
 
 func (ws *WebService) searchBlogsHandler(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +201,7 @@ func (ws *WebService) searchBlogsHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "failed to search blogs", http.StatusInternalServerError)
 		return
 	}
-	ws.setResponse(w, blogs)
+	ws.setResponse(w, http.StatusCreated, blogs)
 }
 
 func (ws *WebService) getBlogHandler(w http.ResponseWriter, r *http.Request) {
