@@ -29,7 +29,8 @@ var (
 	)
 )
 
-func init() {
+func initialize() {
+	logger = utils.Logger()
 	// we need to register the counter so prometheus can collect this metric
 	prometheus.MustRegister(createBlogCount)
 }
@@ -46,7 +47,8 @@ type WebService struct {
 }
 
 func NewWebService(conf *config.Config, authManager *usecases.AuthManager, userManager *usecases.UserManager, blogManager *usecases.BlogManager) *WebService {
-	logger = utils.Logger()
+	// call the initialize func to initialize metrics and anything else we may need
+	initialize()
 	return &WebService{
 		conf:           conf,
 		authMiddleware: NewAuthMiddleware(conf, authManager),
