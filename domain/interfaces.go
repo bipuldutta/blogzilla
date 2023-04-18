@@ -15,7 +15,7 @@ type UserRepo interface {
 }
 
 type AuthRepo interface {
-	GetToken(ctx context.Context, userID int64, permissions []string) (string, error)
+	GetToken(ctx context.Context, userID int64, permissions map[string]any) (string, error)
 }
 
 type BlogRepo interface {

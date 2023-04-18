@@ -83,7 +83,7 @@ func (r *DatabaseRepo) Initialize(ctx context.Context) error {
 		dbLogger.Infof("attempting table creation if necessary, query: %s", query)
 		_, err := r.client.Exec(ctx, query)
 		if err != nil {
-			dbLogger.WithError(err).Error("failed to execute query: %s", query)
+			dbLogger.WithError(err).Errorf("failed to execute query: %s", query)
 			return err
 		}
 	}

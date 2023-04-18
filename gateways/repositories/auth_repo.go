@@ -8,7 +8,7 @@ import (
 	"github.com/bipuldutta/blogzilla/domain"
 	"github.com/bipuldutta/blogzilla/utils"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var authLogger = *utils.Logger()
@@ -23,14 +23,17 @@ func NewAuthRepo(conf *config.Config) domain.AuthRepo {
 	}
 }
 
-func (r *AuthRepo) GetToken(ctx context.Context, userID int64, permissions []string) (string, error) {
+func (r *AuthRepo) GetToken(ctx context.Context, userID int64, permissions map[string]any) (string, error) {
 	currentTime := time.Now().UTC()
 	claims := domain.CustomClaims{
 		UserID:      userID,
 		Permissions: permissions,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: currentTime.Add(time.Minute * time.Duration(r.conf.Login.Expiry)).Unix(),
-			IssuedAt:  currentTime.Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			// A usual scenario is to set the expiration time relative to the current time
+			ExpiresAt: jwt.NewNumericDate(currentTime.Add(time.Minute * time.Duration(r.conf.Login.Expiry))),
+			IssuedAt:  jwt.NewNumericDate(currentTime),
+			NotBefore: jwt.NewNumericDate(currentTime),
+			Issuer:    "blogzilla",
 		},
 	}
 

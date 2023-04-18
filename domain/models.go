@@ -3,7 +3,7 @@ package domain
 import (
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 /*
@@ -40,16 +40,13 @@ type Blog struct {
 // CustomClaims represents the custom claims for the JWT token.
 type CustomClaims struct {
 	UserID      int64
-	Permissions []string
-	jwt.StandardClaims
+	Permissions map[string]any
+	jwt.RegisteredClaims
 }
 
 func (cc *CustomClaims) HasPermission(permission string) bool {
-	// TODO improve this so that the lookup is not O(n), maybe a map?
-	for _, perm := range cc.Permissions {
-		if permission == perm {
-			return true
-		}
+	if _, ok := cc.Permissions[permission]; ok {
+		return true
 	}
 	return false
 }
