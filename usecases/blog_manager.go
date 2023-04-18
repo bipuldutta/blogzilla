@@ -27,6 +27,10 @@ func (m *BlogManager) Create(ctx context.Context, newBlog *domain.Blog) (int64, 
 	return m.blogRepo.Create(ctx, newBlog)
 }
 
+func (m *BlogManager) Get(ctx context.Context, blogID int64) (*domain.Blog, error) {
+	return m.blogRepo.Get(ctx, blogID)
+}
+
 func (m *BlogManager) Search(ctx context.Context, offset int, limit int, search string) ([]*domain.Blog, error) {
 	blogLogger.Infof("offset: %d, limit: %d, search: %s", offset, limit, search)
 	return m.blogRepo.Search(ctx, offset, limit, search)

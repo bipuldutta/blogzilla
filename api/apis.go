@@ -201,11 +201,22 @@ func (ws *WebService) searchBlogsHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "failed to search blogs", http.StatusInternalServerError)
 		return
 	}
-	ws.setResponse(w, http.StatusCreated, blogs)
+	ws.setResponse(w, http.StatusOK, blogs)
 }
 
 func (ws *WebService) getBlogHandler(w http.ResponseWriter, r *http.Request) {
-
+	blogID, err := ws.getID(r)
+	if err != nil {
+		http.Error(w, "failed to get blog", http.StatusBadRequest)
+		return
+	}
+	ctx := utils.CreateContext()
+	blog, err := ws.blogManager.Get(ctx, blogID)
+	if err != nil {
+		http.Error(w, "failed to get blog", http.StatusInternalServerError)
+		return
+	}
+	ws.setResponse(w, http.StatusOK, blog)
 }
 
 func (ws *WebService) updateBlogHandler(w http.ResponseWriter, r *http.Request) {
@@ -222,4 +233,18 @@ func (ws *WebService) getUserID(r *http.Request) int64 {
 		return userID.(int64)
 	}
 	return 0
+}
+
+func (ws *WebService) getID(r *http.Request) (int64, error) {
+	// Get the id from the URL path parameter
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if len(idStr) != 0 {
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return -1, fmt.Errorf("invalid id '%s' provided", idStr)
+		}
+		return int64(id), nil
+	}
+	return -1, fmt.Errorf("invalid id '%s' provided", idStr)
 }

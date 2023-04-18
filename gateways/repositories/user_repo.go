@@ -40,6 +40,7 @@ func NewUserRepo(conf *config.Config, client *pgxpool.Pool, sessionRepo domain.A
 		sessionRepo: sessionRepo,
 	}
 }
+
 func (r *UserRepo) Create(ctx context.Context, newUser *domain.User) (*domain.User, error) {
 	// hash password
 	hashedPassword, err := r.hashPassword(newUser.Password)
@@ -83,6 +84,7 @@ func (r *UserRepo) Create(ctx context.Context, newUser *domain.User) (*domain.Us
 
 	return createdUser, nil
 }
+
 func (r *UserRepo) AssignRoles(ctx context.Context, userID int64, roleIDs ...int64) error {
 	// create user and return its id
 	for _, roleID := range roleIDs {
@@ -122,6 +124,7 @@ func (r *UserRepo) GetRoleByName(ctx context.Context, roleName string) (*domain.
 	}
 	return &role, nil
 }
+
 func (r *UserRepo) GetUserByUsername(ctx context.Context, uname string) (*domain.User, error) {
 	var userID int64
 	var username, password string
@@ -159,6 +162,7 @@ func (r *UserRepo) GetUserByUsername(ctx context.Context, uname string) (*domain
 	}
 	return user, nil
 }
+
 func (r *UserRepo) Login(ctx context.Context, username string, password string) (string, error) {
 	// Get the user from the database
 	user, err := r.GetUserByUsername(ctx, username)
@@ -187,8 +191,9 @@ func (r *UserRepo) Login(ctx context.Context, username string, password string) 
 	}
 	return token, nil
 }
-func (r *UserRepo) getUserPermissions(ctx context.Context, userID int64) ([]string, error) {
-	var permissions []string
+
+func (r *UserRepo) getUserPermissions(ctx context.Context, userID int64) (map[string]any, error) {
+	permissions := make(map[string]any)
 
 	rows, err := r.client.Query(ctx, permissionQuery, userID)
 	if err != nil {
@@ -200,13 +205,14 @@ func (r *UserRepo) getUserPermissions(ctx context.Context, userID int64) ([]stri
 		if err := rows.Scan(&permission); err != nil {
 			return nil, err
 		}
-		permissions = append(permissions, permission)
+		permissions[permission] = nil
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return permissions, nil
 }
+
 func (r *UserRepo) hashPassword(password string) (string, error) {
 	// hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

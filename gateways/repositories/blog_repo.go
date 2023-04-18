@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/bipuldutta/blogzilla/config"
 	"github.com/bipuldutta/blogzilla/domain"
@@ -13,6 +12,10 @@ import (
 
 const (
 	createBlogQuery = `INSERT INTO blogs (user_id, title, content, tags) VALUES ($1, $2, $3, $4) RETURNING id`
+	getBlogQuery    = `
+		SELECT id, user_id, title, content, tags, created_at, updated_at FROM blogs 
+		WHERE id = $1
+    `
 	searchBlogQuery = `
 		SELECT id, user_id, title, content, tags, created_at, updated_at FROM blogs 
 		WHERE (COALESCE(title, '') || ' ' || COALESCE(content, '') || ' ' || COALESCE(tags, '')) ILIKE '%' || $1 || '%'
@@ -47,7 +50,15 @@ func (r *BlogRepo) Create(ctx context.Context, newBlog *domain.Blog) (int64, err
 }
 
 func (r *BlogRepo) Get(ctx context.Context, blogID int64) (*domain.Blog, error) {
-	return nil, fmt.Errorf("not yet implemented")
+	rows := r.client.QueryRow(ctx, getBlogQuery, blogID)
+	var blog domain.Blog
+	err := rows.Scan(&blog.ID, &blog.UserID, &blog.Title, &blog.Content, &blog.Tags, &blog.CreatedAt, &blog.UpdatedAt)
+	if err != nil {
+		blogLogger.WithError(err).Errorf("failed to get blog. blog id: %d", blogID)
+		return nil, err
+	}
+
+	return &blog, nil
 }
 
 func (r *BlogRepo) Search(ctx context.Context, offset int, limit int, search string) ([]*domain.Blog, error) {
